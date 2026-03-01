@@ -1,10 +1,20 @@
+// SpritePlistEditor.jsx
+// Updated: if device aspect ratio is 16:9 or 9:16, shifts the x/y of ALL buttons.
+// Drop this into your React app (Tailwind optional). Export default component.
+
 import React, { useState, useRef, useEffect } from 'react';
 
-// SpritePlistEditor.jsx
-// Single-file React component (TailwindCSS required in host app)
-// Default export a React component that provides a creative spritesheet + .plist editor.
-
 export default function SpritePlistEditor() {
+  // Aspect configuration
+  const ASPECT_TOLERANCE = 0.03; // tolerance for float comparisons
+  const LANDSCAPE_RATIO = 16 / 9;
+  const PORTRAIT_RATIO = 9 / 16;
+  const LANDSCAPE_SHIFT = { x: 48, y: 0 };
+  const PORTRAIT_SHIFT = { x: 0, y: 48 };
+
+  const [btnShift, setBtnShift] = useState({ x: 0, y: 0 });
+
+  // existing state
   const [plistText, setPlistText] = useState('');
   const [plistObj, setPlistObj] = useState(null);
   const [imageFile, setImageFile] = useState(null);
@@ -26,6 +36,23 @@ export default function SpritePlistEditor() {
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startTx: 0, startTy: 0 });
+
+  // Detect aspect ratio and apply button shift if matches 16:9 or 9:16
+  useEffect(() => {
+    function applyAspectShift() {
+      const r = window.innerWidth / Math.max(1, window.innerHeight);
+      if (Math.abs(r - LANDSCAPE_RATIO) < ASPECT_TOLERANCE) {
+        setBtnShift(LANDSCAPE_SHIFT);
+      } else if (Math.abs(r - PORTRAIT_RATIO) < ASPECT_TOLERANCE) {
+        setBtnShift(PORTRAIT_SHIFT);
+      } else {
+        setBtnShift({ x: 0, y: 0 });
+      }
+    }
+    applyAspectShift();
+    window.addEventListener('resize', applyAspectShift);
+    return () => window.removeEventListener('resize', applyAspectShift);
+  }, []);
 
   useEffect(() => {
     if (imageFile) setImageURL(URL.createObjectURL(imageFile));
@@ -61,12 +88,11 @@ export default function SpritePlistEditor() {
   }
 
   function parsePlistToFrames(xmlText) {
-    // Basic TexturePacker .plist parser tolerant to common formats.
     try {
       const parser = new DOMParser();
       const xml = parser.parseFromString(xmlText, 'application/xml');
 
-      // find key named frames
+      // find <key>frames</key> dict
       const keys = Array.from(xml.getElementsByTagName('key'));
       let framesDict = null;
       for (let i = 0; i < keys.length; i++) {
@@ -80,7 +106,6 @@ export default function SpritePlistEditor() {
 
       const frames = [];
       if (framesDict) {
-        // dict children are key,value,key,value...
         const children = Array.from(framesDict.children);
         for (let i = 0; i < children.length; i += 2) {
           const nameKey = children[i];
@@ -96,7 +121,6 @@ export default function SpritePlistEditor() {
             dd[k.textContent] = v.textContent;
           }
 
-          // common fields: frame = "{{x,y},{w,h}}" or "x,y,w,h"; rotated = true/false; offset = "{x,y}"; sourceSize = "{w,h}"
           const frameRect = parseFrameString(dd['frame'] || dd['textureRect'] || dd['rect']);
           const rotated = (dd['rotated'] || 'false') === 'true';
           const offset = parsePointString(dd['offset'] || dd['spriteOffset']);
@@ -106,9 +130,8 @@ export default function SpritePlistEditor() {
         }
       }
 
-      // fallback: try to parse an array of subtextures (other plist/atlas formats)
+      // fallback: try SubTexture style (eg. some texture atlas formats)
       if (frames.length === 0) {
-        // try plist structure where there are <array><dict name=...>
         const subTextures = xml.getElementsByTagName('SubTexture');
         for (let i = 0; i < subTextures.length; i++) {
           const st = subTextures[i];
@@ -269,17 +292,14 @@ export default function SpritePlistEditor() {
   }
 
   function exportPlistWithOffsets() {
-    // naive approach: if we have original xml, insert a userData dict with transforms per frame
     if (!plistObj) return exportJSON();
     const xml = plistObj.cloneNode(true);
-    // create userData key under top-level dict
     const dicts = xml.getElementsByTagName('dict');
     if (dicts.length === 0) return exportJSON();
     const topDict = dicts[0];
 
-    // build userData dict as <key>userData</key><dict>frameName<dict>...</dict></dict>
-    const ks = Array.from(topDict.getElementsByTagName('key'));
     // remove existing userData if present
+    const ks = Array.from(topDict.getElementsByTagName('key'));
     for (let i = 0; i < ks.length; i++) {
       if (ks[i].textContent === 'userData') {
         const node = ks[i].nextElementSibling;
@@ -337,6 +357,16 @@ export default function SpritePlistEditor() {
     URL.revokeObjectURL(url);
   }
 
+  // Small helper to render buttons with the aspect shift applied
+  function ActionButton({ children, onClick, className, type = 'button' }) {
+    const style = { transform: `translate(${btnShift.x}px, ${btnShift.y}px)` };
+    return (
+      <button type={type} onClick={onClick} className={`${className || ''} js-button`} style={style}>
+        {children}
+      </button>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100">
       <aside className="w-80 p-4 border-r border-slate-700 bg-gradient-to-b from-slate-850/40 to-transparent">
@@ -355,14 +385,12 @@ export default function SpritePlistEditor() {
           </div>
 
           <div className="bg-slate-800 p-3 rounded-lg flex flex-col gap-2">
-            <button className="px-3 py-2 rounded bg-gradient-to-r from-cyan-500 to-blue-500 text-black font-semibold" onClick={() => drawCanvas()}>Render Preview</button>
-            <button className="px-3 py-2 rounded border border-slate-600 hover:bg-slate-700" onClick={() => exportJSON()}>Export transforms (.json)</button>
-            <button className="px-3 py-2 rounded border border-slate-600 hover:bg-slate-700" onClick={() => exportPlistWithOffsets()}>Export plist with userdata</button>
+            <ActionButton className="px-3 py-2 rounded bg-gradient-to-r from-cyan-500 to-blue-500 text-black font-semibold" onClick={() => drawCanvas()}>Render Preview</ActionButton>
+            <ActionButton className="px-3 py-2 rounded border border-slate-600 hover:bg-slate-700" onClick={() => exportJSON()}>Export transforms (.json)</ActionButton>
+            <ActionButton className="px-3 py-2 rounded border border-slate-600 hover:bg-slate-700" onClick={() => exportPlistWithOffsets()}>Export plist with userdata</ActionButton>
           </div>
 
-          <div className="text-xs text-slate-400">
-            Tip: drag the preview to move the frame. Use sliders for precise control.
-          </div>
+          <div className="text-xs text-slate-400">Tip: drag the preview to move the frame. Use sliders for precise control.</div>
         </div>
       </aside>
 
@@ -458,8 +486,8 @@ export default function SpritePlistEditor() {
             )}
 
             <div className="mt-4 flex gap-2">
-              <button className="flex-1 px-2 py-1 rounded bg-emerald-500 text-black font-semibold" onClick={() => { setTx(0); setTy(0); setRotation(0); setScaleX(1); setScaleY(1); setAnchorX(0.5); setAnchorY(0.5); setOpacity(1); setTint('#ffffff'); }}>Reset</button>
-              <button className="flex-1 px-2 py-1 rounded border border-slate-600" onClick={() => exportJSON()}>Download JSON</button>
+              <ActionButton className="flex-1 px-2 py-1 rounded bg-emerald-500 text-black font-semibold" onClick={() => { setTx(0); setTy(0); setRotation(0); setScaleX(1); setScaleY(1); setAnchorX(0.5); setAnchorY(0.5); setOpacity(1); setTint('#ffffff'); }}>Reset</ActionButton>
+              <ActionButton className="flex-1 px-2 py-1 rounded border border-slate-600" onClick={() => exportJSON()}>Download JSON</ActionButton>
             </div>
           </aside>
         </div>
@@ -468,7 +496,6 @@ export default function SpritePlistEditor() {
   );
 
   function resetTransformForFrame(idx) {
-    // optionally load per-frame saved transforms if you want
     setTx(0); setTy(0); setRotation(0); setScaleX(1); setScaleY(1); setAnchorX(0.5); setAnchorY(0.5); setOpacity(1); setTint('#ffffff');
   }
 }
