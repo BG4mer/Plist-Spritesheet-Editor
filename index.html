@@ -1,0 +1,25 @@
+<!-- index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sprite Plist Studio</title>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- If you bundle with a bundler (recommended), point `type="module" src="./dist/app.js"` to your bundle.
+       Below is a minimal example that expects a module export default from SpritePlistEditor.jsx compiled to app.js. -->
+
+  <script type="module">
+    import React from 'https://esm.sh/react@18';
+    import ReactDOM from 'https://esm.sh/react-dom@18/client';
+    // If you've compiled/bundled SpritePlistEditor.jsx to ./app.js with default export:
+    import SpritePlistEditor from './app.js'; // replace with your compiled path
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(SpritePlistEditor));
+  </script>
+</body>
+</html>
