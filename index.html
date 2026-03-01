@@ -1,25 +1,677 @@
-<!-- index.html -->
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sprite Plist Studio</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sprite Plist Studio — Pure HTML/JS</title>
+<style>
+  :root{
+    --bg1:#071021; --bg2:#0b1220; --panel:#0f1724; --muted:#9aa6b2; --accent1:#06b6d4; --accent2:#7c3aed;
+    --glass: rgba(255,255,255,0.03);
+    --button-radius:12px;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+  body{
+    background: linear-gradient(160deg,var(--bg1),var(--bg2) 60%);
+    color:#e6eef6;
+    -webkit-font-smoothing:antialiased;
+    display:flex; gap:16px; padding:18px;
+    box-sizing:border-box;
+  }
+
+  /* layout */
+  .sidebar{
+    width:320px; background:linear-gradient(180deg, rgba(255,255,255,0.02), var(--glass));
+    border-radius:14px; padding:18px; box-shadow:0 6px 30px rgba(2,6,23,0.6);
+    border:1px solid rgba(255,255,255,0.03);
+  }
+  .main{flex:1; display:flex; flex-direction:column; gap:14px;}
+  .top{display:flex; align-items:center; gap:12px;}
+  .brand{width:56px;height:56px;border-radius:12px; display:flex;align-items:center;justify-content:center;font-weight:800;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2)); color:#06121a; font-size:18px; box-shadow:0 8px 30px rgba(124,58,237,0.18);}
+  h1{font-size:18px;margin:0;}
+  p.hint{margin:0;color:var(--muted);font-size:13px;}
+
+  .group{background:rgba(255,255,255,0.02); padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;}
+  input[type="file"]{width:100%;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 12px;border-radius:var(--button-radius);cursor:pointer;border:0;font-weight:700;}
+  .btn.primary{background:linear-gradient(90deg,var(--accent1),var(--accent2)); color:#06121a;}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--muted);}
+
+  /* canvas card */
+  .canvas-card{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); border-radius:12px;padding:12px; display:flex; flex-direction:column; gap:12px;
+    border:1px solid rgba(255,255,255,0.03);}
+  canvas{background:linear-gradient(180deg,#051021 0%, rgba(0,0,0,0.16) 100%); border-radius:10px; box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);}
+
+  /* controls */
+  .controls{display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;}
+  .control{background:rgba(255,255,255,0.02); padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);}
+  .control input[type="range"]{width:100%;}
+  .small{font-size:12px;color:var(--muted);}
+
+  /* frames list */
+  .frames{max-height:440px; overflow:auto; margin-top:8px;}
+  .frame-item{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;cursor:pointer;border:1px solid transparent;}
+  .frame-item:hover{background:rgba(255,255,255,0.01); border-color:rgba(255,255,255,0.02);}
+  .frame-item.selected{background:linear-gradient(90deg, rgba(6,182,212,0.08), rgba(124,58,237,0.06)); border-color:rgba(6,182,212,0.12);}
+
+  /* footer actions */
+  .actions{display:flex; gap:8px; flex-wrap:wrap;}
+  .meta{font-size:12px;color:var(--muted); margin-top:8px;}
+
+  /* responsive */
+  @media (max-width:980px){
+    body{flex-direction:column;padding:12px;}
+    .sidebar{width:100%;}
+  }
+
+  /* small helper for range value */
+  .val{font-weight:700;color:#e6eef6;font-size:13px;margin-top:6px}
+
+  /* subtle grid background inside canvas container */
+  .canvas-wrap{display:flex;align-items:center;justify-content:center;padding:12px;background:
+    linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+    border-radius:10px;border:1px solid rgba(255,255,255,0.02);}
+
+  /* tiny tooltipish */
+  .tip{font-size:12px;color:var(--muted)}
+</style>
 </head>
 <body>
-  <div id="root"></div>
 
-  <!-- If you bundle with a bundler (recommended), point `type="module" src="./dist/app.js"` to your bundle.
-       Below is a minimal example that expects a module export default from SpritePlistEditor.jsx compiled to app.js. -->
+  <aside class="sidebar">
+    <div class="top">
+      <div class="brand">SP</div>
+      <div>
+        <h1>Sprite Plist Studio</h1>
+        <p class="hint">Upload a .plist and a spritesheet, edit offsets/rotation/scale and export.</p>
+      </div>
+    </div>
 
-  <script type="module">
-    import React from 'https://esm.sh/react@18';
-    import ReactDOM from 'https://esm.sh/react-dom@18/client';
-    // If you've compiled/bundled SpritePlistEditor.jsx to ./app.js with default export:
-    import SpritePlistEditor from './app.js'; // replace with your compiled path
+    <div class="group" style="margin-top:12px;">
+      <label>Upload .plist (TexturePacker / atlas)</label>
+      <input id="plistFile" type="file" accept=".plist,.xml">
+    </div>
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(React.createElement(SpritePlistEditor));
-  </script>
+    <div class="group" style="margin-top:10px;">
+      <label>Upload spritesheet image</label>
+      <input id="imageFile" type="file" accept="image/*">
+    </div>
+
+    <div class="group" style="margin-top:10px; display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;gap:8px;">
+        <button id="renderBtn" class="btn primary action-btn">Render Preview</button>
+        <button id="exportJsonBtn" class="btn ghost action-btn">Export transforms (.json)</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button id="exportPlistBtn" class="btn ghost action-btn">Export plist with userdata</button>
+        <button id="resetBtn" class="btn ghost action-btn">Reset</button>
+      </div>
+      <div class="meta">Tip: drag inside the canvas to move the selected frame. Sliders for precision.</div>
+    </div>
+
+    <div class="group" style="margin-top:12px;">
+      <div style="font-weight:700;margin-bottom:6px;">Selected frame info</div>
+      <div id="selectedInfo" class="small">No frame selected</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="canvas-card" style="flex:1;min-height:420px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:800">Preview Canvas</div>
+          <div class="tip">Interactive preview — drag to move, use sliders to change transforms</div>
+        </div>
+        <div id="frameCount" class="small">0 frames loaded</div>
+      </div>
+
+      <div class="canvas-wrap" style="margin-top:8px;">
+        <canvas id="preview" width="1100" height="600"></canvas>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <div style="flex:1;">
+          <div class="controls" id="controlsGrid">
+            <div class="control">
+              <label>Offset X</label>
+              <input id="tx" type="range" min="-1000" max="1000" value="0">
+              <div class="val" id="txVal">0 px</div>
+            </div>
+            <div class="control">
+              <label>Offset Y</label>
+              <input id="ty" type="range" min="-1000" max="1000" value="0">
+              <div class="val" id="tyVal">0 px</div>
+            </div>
+            <div class="control">
+              <label>Rotation</label>
+              <input id="rotation" type="range" min="-180" max="180" value="0">
+              <div class="val" id="rotVal">0°</div>
+            </div>
+            <div class="control">
+              <label>Opacity</label>
+              <input id="opacity" type="range" min="0" max="1" step="0.01" value="1">
+              <div class="val" id="opVal">1.00</div>
+            </div>
+
+            <div class="control">
+              <label>Scale X</label>
+              <input id="scaleX" type="range" min="-5" max="5" step="0.01" value="1">
+              <div class="val" id="sxVal">1.00</div>
+            </div>
+            <div class="control">
+              <label>Scale Y</label>
+              <input id="scaleY" type="range" min="-5" max="5" step="0.01" value="1">
+              <div class="val" id="syVal">1.00</div>
+            </div>
+            <div class="control">
+              <label>Anchor X</label>
+              <input id="anchorX" type="range" min="0" max="1" step="0.01" value="0.5">
+              <div class="val" id="axVal">0.50</div>
+            </div>
+            <div class="control">
+              <label>Anchor Y</label>
+              <input id="anchorY" type="range" min="0" max="1" step="0.01" value="0.5">
+              <div class="val" id="ayVal">0.50</div>
+            </div>
+
+            <div class="control" style="grid-column: span 2;">
+              <label>Tint</label>
+              <input id="tint" type="color" value="#ffffff">
+            </div>
+            <div class="control" style="grid-column: span 2;">
+              <label>Preview scale (canvas zoom)</label>
+              <input id="canvasZoom" type="range" min="0.1" max="2" step="0.05" value="1">
+              <div class="val" id="zoomVal">1.00x</div>
+            </div>
+          </div>
+        </div>
+
+        <aside style="width:260px;">
+          <div style="font-weight:700;margin-bottom:6px;">Frames</div>
+          <div id="framesList" class="frames group"></div>
+        </aside>
+      </div>
+
+    </section>
+
+    <section style="display:flex;gap:12px;align-items:center;">
+      <div class="small" id="status">Ready</div>
+      <div style="flex:1"></div>
+      <div class="small">Preview uses center of canvas as origin</div>
+    </section>
+  </main>
+
+<script>
+/* Sprite Plist Studio — Pure HTML / JS
+   - single HTML file, no build step
+   - supports TexturePacker .plist typical formats and SubTexture-style atlases
+   - edits: tx, ty, rotation, scaleX, scaleY, anchorX, anchorY, opacity, tint
+   - drag to move
+   - Export JSON (transforms) and Export Plist (inserts userData dict)
+   - If device aspect ratio is 16:9 or 9:16, translate all buttons by a configured x/y
+*/
+
+/* ====== Config for aspect shifts (if device is 16:9 or 9:16) ====== */
+const ASPECT_TOLERANCE = 0.03;
+const LANDSCAPE_RATIO = 16/9;
+const PORTRAIT_RATIO = 9/16;
+const LANDSCAPE_SHIFT = {x:48, y:0};
+const PORTRAIT_SHIFT  = {x:0, y:48};
+
+function applyButtonShifts(){
+  const r = window.innerWidth / Math.max(1, window.innerHeight);
+  let shift = {x:0,y:0};
+  if (Math.abs(r - LANDSCAPE_RATIO) < ASPECT_TOLERANCE) shift = LANDSCAPE_SHIFT;
+  else if (Math.abs(r - PORTRAIT_RATIO) < ASPECT_TOLERANCE) shift = PORTRAIT_SHIFT;
+  // Apply to all buttons (classless approach so it truly affects ALL buttons)
+  document.querySelectorAll('button, .action-btn').forEach(b=>{
+    b.style.transform = `translate(${shift.x}px, ${shift.y}px)`;
+  });
+}
+window.addEventListener('resize', applyButtonShifts);
+applyButtonShifts();
+
+/* ====== Elements ====== */
+const plistFile = document.getElementById('plistFile');
+const imageFile = document.getElementById('imageFile');
+const renderBtn = document.getElementById('renderBtn');
+const exportJsonBtn = document.getElementById('exportJsonBtn');
+const exportPlistBtn = document.getElementById('exportPlistBtn');
+const resetBtn = document.getElementById('resetBtn');
+const frameCount = document.getElementById('frameCount');
+const framesList = document.getElementById('framesList');
+const selectedInfo = document.getElementById('selectedInfo');
+const status = document.getElementById('status');
+
+const preview = document.getElementById('preview');
+const ctx = preview.getContext('2d');
+
+const txEl = document.getElementById('tx'); const tyEl = document.getElementById('ty');
+const rotEl = document.getElementById('rotation'); const opEl = document.getElementById('opacity');
+const sxEl = document.getElementById('scaleX'); const syEl = document.getElementById('scaleY');
+const axEl = document.getElementById('anchorX'); const ayEl = document.getElementById('anchorY');
+const tintEl = document.getElementById('tint'); const zoomEl = document.getElementById('canvasZoom');
+
+const txVal = document.getElementById('txVal'); const tyVal = document.getElementById('tyVal');
+const rotVal = document.getElementById('rotVal'); const opVal = document.getElementById('opVal');
+const sxVal = document.getElementById('sxVal'); const syVal = document.getElementById('syVal');
+const axVal = document.getElementById('axVal'); const ayVal = document.getElementById('ayVal');
+const zoomVal = document.getElementById('zoomVal');
+
+/* ====== State ====== */
+let plistXml = null;          // DOM Document for plist (if provided)
+let frames = [];              // array of {name, frameRect:{x,y,w,h}, rotated, offset, sourceSize, raw}
+let img = null;               // HTMLImageElement for spritesheet
+let imgURL = null;
+let selectedIndex = null;
+let transforms = {};          // optional saved transforms per frameName (not persisted unless exported)
+let canvasZoom = 1;
+
+/* default transforms for current selected */
+let tx=0, ty=0, rotation=0, scaleX=1, scaleY=1, anchorX=0.5, anchorY=0.5, opacity=1, tint='#ffffff';
+
+function setStatus(s){ status.textContent = s; }
+
+/* ====== File inputs ====== */
+plistFile.addEventListener('change', (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try {
+      const xml = new DOMParser().parseFromString(ev.target.result, 'application/xml');
+      plistXml = xml;
+      const parsed = parsePlistToFrames(xml);
+      frames = parsed.frames;
+      selectedIndex = frames.length?0:null;
+      renderFrameList();
+      setStatus('Plist parsed: ' + frames.length + ' frames');
+      frameCount.textContent = frames.length + ' frames loaded';
+      if (selectedIndex !== null) loadTransformsFor(selectedIndex);
+      draw();
+    } catch(err){
+      console.error(err);
+      setStatus('Plist parse failed');
+    }
+  };
+  reader.readAsText(f);
+});
+
+imageFile.addEventListener('change', (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  if (imgURL) URL.revokeObjectURL(imgURL);
+  imgURL = URL.createObjectURL(f);
+  const i = new Image();
+  i.onload = ()=>{
+    img = i;
+    setStatus('Spritesheet loaded (' + img.width + 'x' + img.height + ')');
+    draw();
+  };
+  i.src = imgURL;
+});
+
+/* ====== Parse plist XML to frames ====== */
+function parsePlistToFrames(xml){
+  const keys = Array.from(xml.getElementsByTagName('key'));
+  let framesDict = null;
+  for(let k of keys){
+    if (k.textContent.trim()==='frames'){
+      let node = k.nextElementSibling;
+      if (node && node.tagName === 'dict') { framesDict = node; break; }
+    }
+  }
+
+  const outFrames = [];
+  if (framesDict){
+    const children = Array.from(framesDict.children);
+    for(let i=0;i<children.length;i+=2){
+      const nameKey = children[i];
+      const valueDict = children[i+1];
+      if (!nameKey || !valueDict) break;
+      const name = nameKey.textContent;
+      const dd = {};
+      const kv = Array.from(valueDict.children);
+      for(let j=0;j<kv.length;j+=2){
+        const kk = kv[j], vv = kv[j+1];
+        if (!kk || !vv) break;
+        dd[kk.textContent] = vv.textContent;
+      }
+      const frameRect = parseFrameString(dd['frame'] || dd['textureRect'] || dd['rect']);
+      const rotated = (dd['rotated'] || 'false') === 'true';
+      const offset = parsePointString(dd['offset'] || dd['spriteOffset']);
+      const sourceSize = parsePointString(dd['sourceSize'] || dd['spriteSourceSize']);
+      outFrames.push({name, frameRect, rotated, offset, sourceSize, raw: dd});
+    }
+  }
+
+  // fallback SubTexture style
+  if (outFrames.length === 0){
+    const sub = xml.getElementsByTagName('SubTexture');
+    for(let i=0;i<sub.length;i++){
+      const st = sub[i];
+      const name = st.getAttribute('name') || ('frame_' + i);
+      const x = parseInt(st.getAttribute('x')||'0',10);
+      const y = parseInt(st.getAttribute('y')||'0',10);
+      const w = parseInt(st.getAttribute('width')||'0',10);
+      const h = parseInt(st.getAttribute('height')||'0',10);
+      outFrames.push({name, frameRect:{x,y,w,h}, rotated:false, offset:{x:0,y:0}, sourceSize:{x:w,y:h}, raw:{}});
+    }
+  }
+
+  return {frames: outFrames, xmlDoc: xml};
+}
+
+function parseFrameString(s){
+  if (!s) return {x:0,y:0,w:0,h:0};
+  const nums = s.replace(/[{} ]+/g,'').split(/,|\s+/).map(v=>parseFloat(v)).filter(v=>!Number.isNaN(v));
+  if (nums.length>=4) return {x:nums[0], y:nums[1], w:nums[2], h:nums[3]};
+  return {x:0,y:0,w:0,h:0};
+}
+function parsePointString(s){
+  if (!s) return {x:0,y:0};
+  const nums = s.replace(/[{} ]+/g,'').split(/,|\s+/).map(v=>parseFloat(v)).filter(v=>!Number.isNaN(v));
+  if (nums.length>=2) return {x:nums[0], y:nums[1]};
+  return {x:0,y:0};
+}
+
+/* ====== Render frames list UI ====== */
+function renderFrameList(){
+  framesList.innerHTML = '';
+  frames.forEach((f, idx)=>{
+    const el = document.createElement('div');
+    el.className = 'frame-item' + (idx===selectedIndex? ' selected':'');
+    el.innerHTML = '<div style="overflow:hidden"><div style="font-weight:700;font-size:13px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">' + escapeHtml(f.name) + '</div>' +
+                   '<div style="font-size:12px;color:var(--muted)">' + f.frameRect.w + 'x' + f.frameRect.h + ' @ ' + f.frameRect.x + ',' + f.frameRect.y + '</div></div>' +
+                   '<div style="margin-left:8px;color:var(--muted)">#' + idx + '</div>';
+    el.addEventListener('click', ()=>{
+      selectedIndex = idx;
+      loadTransformsFor(idx);
+      renderFrameList();
+      draw();
+    });
+    framesList.appendChild(el);
+  });
+}
+
+/* escape for safety in innerHTML usage above */
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ====== Load / Save small per-frame transforms in memory ====== */
+function loadTransformsFor(idx){
+  if (idx==null || !frames[idx]) return;
+  const f = frames[idx];
+  const saved = transforms[f.name];
+  if (saved){
+    ({tx,ty,rotation,scaleX,scaleY,anchorX,anchorY,opacity,tint} = saved);
+  } else {
+    tx=0; ty=0; rotation=0; scaleX=1; scaleY=1; anchorX=0.5; anchorY=0.5; opacity=1; tint='#ffffff';
+  }
+  // update UI controls
+  txEl.value = tx; tyEl.value = ty; rotEl.value=rotation; opEl.value=opacity;
+  sxEl.value=scaleX; syEl.value=scaleY; axEl.value=anchorX; ayEl.value=anchorY;
+  tintEl.value = tint;
+  updateValueLabels();
+  updateSelectedInfo();
+}
+function saveTransformsFor(idx){
+  if (idx==null || !frames[idx]) return;
+  const f = frames[idx];
+  transforms[f.name] = {tx,ty,rotation,scaleX,scaleY,anchorX,anchorY,opacity,tint};
+}
+
+/* ====== Controls handlers ====== */
+function updateValueLabels(){
+  txVal.textContent = tx + ' px';
+  tyVal.textContent = ty + ' px';
+  rotVal.textContent = rotation + '°';
+  opVal.textContent = Number(opacity).toFixed(2);
+  sxVal.textContent = Number(scaleX).toFixed(2);
+  syVal.textContent = Number(scaleY).toFixed(2);
+  axVal.textContent = Number(anchorX).toFixed(2);
+  ayVal.textContent = Number(anchorY).toFixed(2);
+  zoomVal.textContent = Number(canvasZoom).toFixed(2) + 'x';
+}
+txEl.addEventListener('input', e=>{ tx = Number(e.target.value); saveTransformsFor(selectedIndex); updateValueLabels(); draw(); });
+tyEl.addEventListener('input', e=>{ ty = Number(e.target.value); saveTransformsFor(selectedIndex); updateValueLabels(); draw(); });
+rotEl.addEventListener('input', e=>{ rotation = Number(e.target.value); saveTransformsFor(selectedIndex); updateValueLabels(); draw(); });
+opEl.addEventListener('input', e=>{ opacity = Number(e.target.value); saveTransformsFor(selectedIndex); updateValueLabels(); draw(); });
+sxEl.addEventListener('input', e=>{ scaleX = Number(e.target.value); saveTransformsFor(selectedIndex); updateValueLabels(); draw(); });
+syEl.addEventListener('input', e=>{ scaleY = Number(e.target.value); saveTransformsFor(selectedIndex); updateValueLabels(); draw(); });
+axEl.addEventListener('input', e=>{ anchorX = Number(e.target.value); saveTransformsFor(selectedIndex); updateValueLabels(); draw(); });
+ayEl.addEventListener('input', e=>{ anchorY = Number(e.target.value); saveTransformsFor(selectedIndex); updateValueLabels(); draw(); });
+tintEl.addEventListener('input', e=>{ tint = e.target.value; saveTransformsFor(selectedIndex); draw(); });
+zoomEl.addEventListener('input', e=>{ canvasZoom = Number(e.target.value); updateValueLabels(); draw(); });
+
+/* Reset button */
+resetBtn.addEventListener('click', ()=>{
+  tx=0; ty=0; rotation=0; scaleX=1; scaleY=1; anchorX=0.5; anchorY=0.5; opacity=1; tint='#ffffff';
+  saveTransformsFor(selectedIndex);
+  txEl.value=tx; tyEl.value=ty; rotEl.value=rotation; opEl.value=opacity;
+  sxEl.value=scaleX; syEl.value=scaleY; axEl.value=anchorX; ayEl.value=anchorY;
+  tintEl.value = tint;
+  updateValueLabels(); draw();
+});
+
+/* Render button */
+renderBtn.addEventListener('click', ()=>{ draw(); setStatus('Rendered'); });
+
+/* ====== Canvas drawing logic ====== */
+function clearCanvas(){
+  ctx.clearRect(0,0,preview.width, preview.height);
+}
+function drawGrid(){
+  const gridSize = 32 * canvasZoom;
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  for(let x=0;x<preview.width;x+=gridSize){
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,preview.height); ctx.stroke();
+  }
+  for(let y=0;y<preview.height;y+=gridSize){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(preview.width,y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function draw(){
+  clearCanvas();
+  drawGrid();
+
+  if (!img) return;
+  // small thumbnail top-left
+  const thumbW = 140 * canvasZoom;
+  const thumbH = thumbW * (img.height / img.width);
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.drawImage(img, 8,8, thumbW, thumbH);
+  ctx.restore();
+
+  if (selectedIndex == null || !frames[selectedIndex]) return;
+  const f = frames[selectedIndex];
+  const fr = f.frameRect;
+
+  // center coordinates
+  const cx = preview.width/2;
+  const cy = preview.height/2;
+
+  ctx.save();
+  ctx.translate(cx + tx*canvasZoom, cy + ty*canvasZoom);
+  ctx.rotate(rotation * Math.PI / 180);
+  ctx.scale(scaleX * canvasZoom, scaleY * canvasZoom);
+  ctx.globalAlpha = opacity;
+
+  const drawW = fr.w;
+  const drawH = fr.h;
+  const dx = -anchorX * drawW;
+  const dy = -anchorY * drawH;
+
+  // draw from spritesheet
+  ctx.drawImage(img, fr.x, fr.y, fr.w, fr.h, dx, dy, drawW, drawH);
+
+  // tint (multiply)
+  if (tint && tint !== '#ffffff'){
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = tint;
+    ctx.fillRect(dx, dy, drawW, drawH);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // bounding box / origin cross
+  ctx.strokeStyle = '#00f6ff';
+  ctx.lineWidth = 2 / Math.max(1, canvasZoom);
+  ctx.strokeRect(dx - 0.5, dy - 0.5, drawW + 1, drawH + 1);
+
+  ctx.strokeStyle = '#ff6b6b';
+  ctx.beginPath();
+  ctx.moveTo(-10,0); ctx.lineTo(10,0); ctx.moveTo(0,-10); ctx.lineTo(0,10); ctx.stroke();
+
+  ctx.restore();
+
+  updateSelectedInfo();
+}
+
+/* ====== Canvas drag to move ====== */
+let dragging = false, dragStart = {x:0,y:0}, startTx=0, startTy=0;
+preview.addEventListener('mousedown', (e)=>{
+  dragging = true;
+  const rect = preview.getBoundingClientRect();
+  dragStart.x = e.clientX - rect.left; dragStart.y = e.clientY - rect.top;
+  startTx = tx; startTy = ty;
+  preview.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', (e)=>{
+  if (!dragging) return;
+  const rect = preview.getBoundingClientRect();
+  const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+  const dx = x - dragStart.x; const dy = y - dragStart.y;
+  tx = startTx + dx / canvasZoom;
+  ty = startTy + dy / canvasZoom;
+  // clamp? not necessary
+  // update controls & save
+  txEl.value = tx; tyEl.value = ty;
+  saveTransformsFor(selectedIndex);
+  updateValueLabels();
+  draw();
+});
+window.addEventListener('mouseup', ()=>{
+  if (!dragging) return;
+  dragging = false; preview.style.cursor='default';
+});
+
+/* update selected info UI */
+function updateSelectedInfo(){
+  if (selectedIndex==null || !frames[selectedIndex]) {
+    selectedInfo.textContent = 'No frame selected';
+    return;
+  }
+  const f = frames[selectedIndex];
+  selectedInfo.textContent = f.name + ' — Rect: ' + f.frameRect.x + ',' + f.frameRect.y + ',' + f.frameRect.w + 'x' + f.frameRect.h;
+}
+
+/* ====== Export JSON (transforms) ====== */
+exportJsonBtn.addEventListener('click', ()=>{
+  // ensure current saved
+  saveTransformsFor(selectedIndex);
+  const payload = { frames: frames.map((f,idx)=>({ name:f.name, transform: transforms[f.name] || null })) };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'spritesheet-transforms.json'; a.click();
+  URL.revokeObjectURL(url);
+  setStatus('Downloaded transforms JSON');
+});
+
+/* ====== Export plist with userdata ====== */
+exportPlistBtn.addEventListener('click', ()=>{
+  if (!plistXml){
+    // fallback: export JSON instead
+    exportJsonBtn.click();
+    setStatus('No plist loaded; exported JSON instead');
+    return;
+  }
+  // clone the XML doc so we don't permanently modify original object
+  const xml = plistXml.cloneNode(true);
+  // find top dict under <plist> or the first dict
+  const dicts = xml.getElementsByTagName('dict');
+  if (!dicts || dicts.length === 0){
+    exportJsonBtn.click();
+    setStatus('Plist missing dict — exported JSON instead');
+    return;
+  }
+  const topDict = dicts[0];
+
+  // remove existing userData if present
+  const keys = Array.from(topDict.getElementsByTagName('key'));
+  for(let k of keys){
+    if (k.textContent === 'userData'){
+      const node = k.nextElementSibling;
+      if (node) topDict.removeChild(node);
+      topDict.removeChild(k);
+      break;
+    }
+  }
+
+  // create userData dict and add per-frame entries
+  const userKey = xml.createElement('key'); userKey.textContent = 'userData';
+  const userDict = xml.createElement('dict');
+
+  // ensure transforms saved
+  saveTransformsFor(selectedIndex);
+
+  frames.forEach((f, idx)=>{
+    const k = xml.createElement('key'); k.textContent = f.name;
+    const d = xml.createElement('dict');
+
+    const addKV = (name, value)=>{
+      const kk = xml.createElement('key'); kk.textContent = name;
+      const vv = xml.createElement('string'); vv.textContent = String(value);
+      d.appendChild(kk); d.appendChild(vv);
+    };
+
+    const t = transforms[f.name] || null;
+    if (t){
+      addKV('tx', t.tx);
+      addKV('ty', t.ty);
+      addKV('rotation', t.rotation);
+      addKV('scaleX', t.scaleX);
+      addKV('scaleY', t.scaleY);
+      addKV('anchorX', t.anchorX);
+      addKV('anchorY', t.anchorY);
+      addKV('opacity', t.opacity);
+      addKV('tint', t.tint);
+    }
+
+    userDict.appendChild(k); userDict.appendChild(d);
+  });
+
+  topDict.appendChild(userKey); topDict.appendChild(userDict);
+
+  const serializer = new XMLSerializer();
+  const out = serializer.serializeToString(xml);
+  const blob = new Blob([out], {type:'application/xml'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'spritesheet-with-userdata.plist'; a.click();
+  URL.revokeObjectURL(url);
+  setStatus('Exported plist with userData');
+});
+
+/* ====== Utility: when plists are not uploaded but frames exist (e.g. SubTexture), export still works because we cloned xml earlier ====== */
+
+/* ====== Initialize small demo-friendly behavior: auto-select first parsed frame, etc. ====== */
+function init(){
+  updateValueLabels();
+  setStatus('Ready');
+}
+init();
+
+/* ====== expose draw so buttons can call it if needed from console (debug) ====== */
+window.SPStudio = { draw };
+
+/* ====== ensure initial selection info ====== */
+updateSelectedInfo();
+
+</script>
 </body>
 </html>
